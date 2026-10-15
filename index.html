@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聲控解謎成語大冒險 - 國小中高年級成語語音學習網</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti for winning effects -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: linear-gradient(135deg, #FFFDF0 0%, #FEF9C3 50%, #FEF3C7 100%);
+            color: #374151;
+            min-height: 100vh;
+        }
+
+        .font-rounded {
+            font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+        }
+
+        /* Ruby Zhuyin styling */
+        ruby {
+            ruby-position: over;
+            display: inline-flex;
+            flex-direction: column-reverse;
+            align-items: center;
+            margin: 0 4px;
+            line-height: 1.8;
+        }
+
+        rt {
+            font-size: 0.42em;
+            color: #D97706;
+            font-weight: 700;
+            line-height: 1.1;
+            user-select: none;
+        }
+
+        /* Mic Pulsing Effects */
+        @keyframes mic-pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .listening-active {
+            animation: mic-pulse 1.5s infinite;
+            background-color: #EF4444 !important;
+        }
+
+        /* Golden Glow for Missing Character Tile */
+        @keyframes tile-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.5); border-color: #F59E0B; }
+            50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.9); border-color: #D97706; }
+        }
+
+        .missing-tile {
+            animation: tile-glow 2s infinite;
+            background: #FEF3C7;
+        }
+
+        @keyframes fill-success {
+            0% { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+            50% { transform: scale(1.2) rotate(5deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .tile-revealed {
+            animation: fill-success 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            background-color: #10B981 !important;
+            color: white !important;
+        }
+
+        /* Soundwave bar indicator */
+        .bar {
+            width: 4px;
+            height: 16px;
+            background-color: #EF4444;
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .bar:nth-child(2) { animation-delay: 0.1s; }
+        .bar:nth-child(3) { animation-delay: 0.2s; }
+        .bar:nth-child(4) { animation-delay: 0.3s; }
+
+        @keyframes wave {
+            0%, 100% { height: 8px; }
+            50% { height: 28px; }
+        }
+    </style>
+</head>
+<body class="flex flex-col justify-between min-h-screen selection:bg-amber-200">
+
+    <header class="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white shadow-lg py-4 px-6 rounded-b-3xl">
+        <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-md text-2xl font-black">
+                    <i class="fa-solid fa-microphone-lines"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wide font-rounded drop-shadow-sm">聲控解謎成語大冒險</h1>
+                    <p class="text-xs sm:text-sm font-medium text-amber-100">國小中高年級 · 語音互動闖關遊戲</p>
+                </div>
+            </div>
+
+            <!-- Stats Panel -->
+            <div class="flex items-center gap-4 bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-sm font-bold">
+                <div class="flex items-center gap-1.5" title="目前的得分">
+                    <i class="fa-solid fa-trophy text-amber-300 text-lg"></i>
+                    <span>得分：<span id="scoreText" class="text-white text-lg font-extrabold">0</span></span>
+                </div>
+                <div class="w-px h-5 bg-white/40"></div>
+                <div class="flex items-center gap-1.5" title="挑戰關卡">
+                    <i class="fa-solid fa-flag-checkered text-amber-200"></i>
+                    <span>關卡：<span id="levelText" class="text-white">1</span> / <span id="totalLevelText">12</span></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl w-full mx-auto px-4 py-6 flex-grow space-y-6">
+
+        <!-- Category Selector Header -->
+        <div class="flex items-center justify-center gap-2 flex-wrap">
+            <button onclick="switchCategory('all')" id="cat-all" class="cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500 text-white shadow transition-all">全部成語</button>
+            <button onclick="switchCategory('animal')" id="cat-animal" class="cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-white text-amber-800 hover:bg-amber-100 border border-amber-200 transition-all">🐶 動物篇</button>
+            <button onclick="switchCategory('plant')" id="cat-plant" class="cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-white text-amber-800 hover:bg-amber-100 border border-amber-200 transition-all">🌱 植物篇</button>
+            <button onclick="switchCategory('number')" id="cat-number" class="cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-white text-amber-800 hover:bg-amber-100 border border-amber-200 transition-all">🔢 數字篇</button>
+            <button onclick="switchCategory('nature')" id="cat-nature" class="cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-white text-amber-800 hover:bg-amber-100 border border-amber-200 transition-all">☁️ 自然篇</button>
+        </div>
+
+        <!-- Main Game Card -->
+        <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-amber-900/10 border-2 border-amber-200 relative overflow-hidden">
+            
+            <!-- Category Tag & Audio Hint Button -->
+            <div class="flex items-center justify-between mb-6">
+                <span id="categoryBadge" class="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-bookmark"></i> 成語關卡
+                </span>
+
+                <button onclick="playModelSpeech()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-xl border border-amber-200 transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-volume-high text-amber-600 text-sm"></i>
+                    <span>示範朗讀</span>
+                </button>
+            </div>
+
+            <!-- Idiom Puzzle Character Tiles -->
+            <div id="puzzleContainer" class="flex items-center justify-center gap-3 sm:gap-6 my-8 py-4">
+                <!-- Dynamic Character Boxes with Ruby Zhuyin inserted here -->
+            </div>
+
+            <!-- Hint / Meaning Box -->
+            <div class="bg-amber-50/80 rounded-2xl p-4 sm:p-5 border border-amber-200 text-center max-w-2xl mx-auto space-y-2">
+                <div class="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-lightbulb text-amber-500"></i> 解謎線索 / 成語釋義
+                </div>
+                <p id="meaningText" class="text-base sm:text-lg text-slate-700 font-medium leading-relaxed">
+                    載入題目中...
+                </p>
+                <div id="exampleText" class="text-xs sm:text-sm text-slate-500 italic mt-1"></div>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-amber-100 flex flex-col items-center justify-center space-y-4">
+                
+                <!-- Status Message Indicator -->
+                <div id="statusBox" class="text-center min-h-[32px] flex items-center justify-center">
+                    <p id="statusText" class="text-sm font-bold text-amber-800 bg-amber-100/70 px-4 py-1.5 rounded-full">
+                        請按下下方「紅色麥克風」開始對著麥克風唸出完整四字成語
+                    </p>
+                </div>
+
+                <!-- Voice Listening Visualizer (Hidden by default) -->
+                <div id="waveVisualizer" class="hidden items-center gap-1 py-1">
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    <span class="text-xs font-bold text-red-500 ml-2">正在聆聽您的發音...</span>
+                </div>
+
+                <!-- Big Mic Button -->
+                <div class="flex items-center justify-center gap-4">
+                    <button id="micBtn" onclick="toggleSpeechRecognition()" 
+                        class="w-20 h-20 bg-gradient-to-tr from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-full shadow-lg shadow-orange-500/30 flex flex-col items-center justify-center transition-all transform active:scale-95 cursor-pointer">
+                        <i id="micIcon" class="fa-solid fa-microphone text-2xl"></i>
+                        <span id="micLabel" class="text-[10px] font-bold mt-1">開始唸成語</span>
+                    </button>
+                </div>
+
+                <!-- Speech Recognition Feedback Result -->
+                <div class="text-center">
+                    <span class="text-xs font-semibold text-slate-400">偵測到的語音內容：</span>
+                    <span id="transcriptResult" class="text-sm font-extrabold text-amber-900 underline decoration-amber-400 min-w-[60px] inline-block">「等待發音中...」</span>
+                </div>
+
+                <!-- Manual Input Toggle (Fallback mode) -->
+                <div class="pt-2">
+                    <button onclick="toggleManualInputModal()" class="text-xs text-amber-700 hover:text-amber-900 font-semibold underline flex items-center gap-1">
+                        <i class="fa-solid fa-keyboard"></i> 麥克風無法使用？切換為文字輸入打字過關
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Level Navigation Controls -->
+        <div class="flex items-center justify-between px-2">
+            <button onclick="prevLevel()" class="px-5 py-2.5 bg-white hover:bg-amber-100 text-amber-800 font-bold text-sm rounded-xl border border-amber-300 shadow-sm transition-all flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left"></i> 上一題
+            </button>
+            <button onclick="nextLevel()" class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center gap-2">
+                下一題 <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </main>
+
+    <!-- Manual Input Modal Dialog -->
+    <div id="manualModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-2 border-amber-300 relative transform transition-all">
+            <button onclick="toggleManualInputModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <h3 class="text-lg font-bold text-amber-900 flex items-center gap-2 mb-2">
+                <i class="fa-solid fa-keyboard text-orange-500"></i> 文字輸入答題
+            </h3>
+            <p class="text-xs text-slate-500 mb-4">請在下方輸入完整的四字成語答案（例如：守株待兔）：</p>
+
+            <input type="text" id="manualAnswerInput" placeholder="請輸入四字成語..." maxlength="10" 
+                class="w-full p-3 border-2 border-amber-300 rounded-xl text-center text-xl font-bold text-slate-800 outline-none focus:ring-4 focus:ring-amber-200 mb-4">
+
+            <button onclick="submitManualAnswer()" class="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-md hover:from-orange-600 hover:to-amber-600 transition-all">
+                確認送出答案
+            </button>
+        </div>
+    </div>
+
+    <!-- Victory Level Modal -->
+    <div id="victoryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-4 border-amber-400 text-center space-y-4">
+            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-3xl font-black">
+                <i class="fa-solid fa-trophy text-amber-500 animate-bounce"></i>
+            </div>
+            <h3 class="text-2xl font-black text-amber-900">恭喜答對了！</h3>
+            <p id="victoryDetailText" class="text-sm font-bold text-slate-600">語音辨識成功，成語完整解鎖！</p>
+            
+            <button onclick="closeVictoryModalAndNext()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:from-emerald-600 hover:to-teal-700 transition-all text-base">
+                繼續挑戰下一關 <i class="fa-solid fa-chevron-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <footer class="w-full text-center py-4 text-amber-900/70 text-xs font-medium border-t border-amber-200/60 bg-amber-100/30 mt-8">
+        <p>聲控解謎成語大冒險 · 國小語音互動學習教學資源</p>
+    </footer>
+
+    <script>
+        // Elementary Curriculum Idiom Bank (with Zhuyin, Category, Definition, Example, and Missing index)
+        const idiomDatabase = [
+            {
+                idiom: '守株待兔',
+                zhuyin: ['ㄕㄡˇ', 'ㄓㄨ', 'ㄉㄞˋ', 'ㄊㄨˋ'],
+                missingIndex: 3, // Missing '兔'
+                category: 'animal',
+                categoryName: '🐶 動物篇',
+                meaning: '比喻拘泥守舊，不知變通，或妄想不勞而獲。',
+                example: '例句：我們應該主動尋求機會，而不是守株待兔。'
+            },
+            {
+                idiom: '畫蛇添足',
+                zhuyin: ['ㄏㄨㄚˋ', 'ㄕㄜˊ', 'ㄊㄧㄢ', 'ㄗㄨˊ'],
+                missingIndex: 3, // Missing '足'
+                category: 'animal',
+                categoryName: '🐶 動物篇',
+                meaning: '比喻多此一舉，不但無益，反而不合適。',
+                example: '例句：這幅畫已經很完美了，再加色彩簡直是畫蛇添足。'
+            },
+            {
+                idiom: '胸有成竹',
+                zhuyin: ['ㄒㄧㄨㄥ', 'ㄧㄡˇ', 'ㄔㄥˊ', 'ㄓㄨˊ'],
+                missingIndex: 3, // Missing '竹'
+                category: 'plant',
+                categoryName: '🌱 植物篇',
+                meaning: '比喻做事之前心中已有完整的謀劃與把握。',
+                example: '例句：對於這次的國語演講比賽，他早已胸有成竹。'
+            },
+            {
+                idiom: '千鈞一髮',
+                zhuyin: ['ㄑㄧㄢ', 'ㄐㄩㄣ', 'ㄧˋ', 'ㄈㄚˇ'],
+                missingIndex: 0, // Missing '千'
+                category: 'number',
+                categoryName: '🔢 數字篇',
+                meaning: '比喻情況極為危急迫切。',
+                example: '例句：在這千鈞一髮的時刻，消防隊員英勇地救出了小孩。'
+            },
+            {
+                idiom: '水落石出',
+                zhuyin: ['ㄕㄨㄟˇ', 'ㄌㄨㄛˋ', 'ㄕˊ', 'ㄔㄨ'],
+                missingIndex: 2, // Missing '石'
+                category: 'nature',
+                categoryName: '☁️ 自然篇',
+                meaning: '比喻事情的真相完全大白。',
+                example: '例句：經過警察連日調查，這件失竊案終於水落石出了。'
+            },
+            {
+                idiom: '井底之蛙',
+                zhuyin: ['ㄐㄧㄥˇ', 'ㄉㄧˇ', 'ㄓ', 'ㄨㄚ'],
+                missingIndex: 3, // Missing '蛙'
+                category: 'animal',
+                categoryName: '🐶 動物篇',
+                meaning: '比喻見識狹小、眼界短淺的人。',
+                example: '例句：多出國走走看看，才不會成為井底之蛙。'
+            },
+            {
+                idiom: '雨過天晴',
+                zhuyin: ['ㄩˇ', 'ㄍㄨㄛˋ', 'ㄊㄧㄢ', 'ㄑㄧㄥˊ'],
+                missingIndex: 3, // Missing '晴'
+                category: 'nature',
+                categoryName: '☁️ 自然篇',
+                meaning: '比喻壞的情況過去，好轉的情況到來。',
+                example: '例句：這場誤會解釋清楚後，大家的心情便雨過天晴了。'
+            },
+            {
+                idiom: '世外桃源',
+                zhuyin: ['ㄕˋ', 'ㄨㄞˋ', 'ㄊㄠˊ', 'ㄩㄢˊ'],
+                missingIndex: 2, // Missing '桃'
+                category: 'plant',
+                categoryName: '🌱 植物篇',
+                meaning: '比喻風景優美、環境安樂的理想地方。',
+                example: '例句：這座山村風景秀麗、空氣清新，真像個世外桃源。'
+            },
+            {
+                idiom: '一箭雙雕',
+                zhuyin: ['ㄧˊ', 'ㄐㄧㄢˋ', 'ㄕㄨㄤ', 'ㄉㄧㄠ'],
+                missingIndex: 2, // Missing '雙'
+                category: 'number',
+                categoryName: '🔢 數字篇',
+                meaning: '比喻做一件事同時達到兩種目的。',
+                example: '例句：參加這次訓練既能學到新技能又能結交朋友，真是一箭雙雕。'
+            },
+            {
+                idiom: '亡羊補牢',
+                zhuyin: ['ㄨㄤˊ', 'ㄧㄤˊ', 'ㄅㄨˇ', 'ㄌㄠˊ'],
+                missingIndex: 1, // Missing '羊'
+                category: 'animal',
+                categoryName: '🐶 動物篇',
+                meaning: '比喻犯錯或受損後及時採取補救措施，防止繼續損失。',
+                example: '例句：雖然之前考砸了，但只要現在亡羊補牢努力複習還來得及。'
+            },
+            {
+                idiom: '風吹草動',
+                zhuyin: ['ㄈㄥ', 'ㄔㄨㄟ', 'ㄘㄠˇ', 'ㄉㄨㄥˋ'],
+                missingIndex: 2, // Missing '草'
+                category: 'plant',
+                categoryName: '🌱 植物篇',
+                meaning: '比喻輕微的動靜或風浪。',
+                example: '例句：他生性警覺，稍微有一點風吹草動就會立刻醒來。'
+            },
+            {
+                idiom: '九牛一毛',
+                zhuyin: ['ㄐㄧㄡˇ', 'ㄋㄧㄡˊ', 'ㄧˋ', 'ㄇㄠˊ'],
+                missingIndex: 0, // Missing '九'
+                category: 'number',
+                categoryName: '🔢 數字篇',
+                meaning: '比喻極大數量中的極小部分，微不足道。',
+                example: '例句：這點花費對富翁來說不過是九牛一毛。'
+            }
+        ];
+
+        // State variables
+        let currentFilteredList = [...idiomDatabase];
+        let currentIndex = 0;
+        let score = 0;
+        let isListening = false;
+        let recognition = null;
+        let synth = window.speechSynthesis;
+        let isSolved = false;
+
+        // Web Audio API synth sound generator
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        }
+
+        function playSoundEffect(type) {
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'success') {
+                    // Two chime tones
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15); // E5
+                    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.3); // G5
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.6);
+                } else if (type === 'error') {
+                    // Low buzz
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, ctx.currentTime);
+                    osc.frequency.setValueAtTime(130, ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.4);
+                }
+            } catch(e) {
+                console.log('Audio playback initialized on click');
+            }
+        }
+
+        // Initialize Speech Recognition Engine
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                document.getElementById('statusText').innerText = '您的瀏覽器不支援 Web Speech 語音辨識，請使用 Chrome 瀏覽器或點擊下方文字輸入。';
+                document.getElementById('micBtn').classList.add('opacity-50', 'cursor-not-allowed');
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-TW';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = function() {
+                isListening = true;
+                document.getElementById('micBtn').classList.add('listening-active');
+                document.getElementById('micIcon').className = 'fa-solid fa-microphone-lines text-3xl animate-bounce';
+                document.getElementById('micLabel').innerText = '聆聽中...';
+                document.getElementById('waveVisualizer').classList.remove('hidden');
+                document.getElementById('waveVisualizer').classList.add('flex');
+                document.getElementById('statusText').innerText = '請清晰唸出完整的四字成語...';
+                document.getElementById('statusText').className = 'text-sm font-bold text-red-600 bg-red-100 px-4 py-1.5 rounded-full';
+            };
+
+            recognition.onresult = function(event) {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+
+                // Clean transcript removing spaces and punctuation
+                const cleanTranscript = transcript.replace(/[^\u4e00-\u9fa5]/g, '');
+                document.getElementById('transcriptResult').innerText = `「${cleanTranscript || '正在收音...'}」`;
+
+                const currentItem = currentFilteredList[currentIndex];
+
+                // Check if spoken result contains the key idiom
+                if (cleanTranscript.includes(currentItem.idiom)) {
+                    recognition.stop();
+                    handleAnswerSuccess();
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error:', event.error);
+                stopListeningUI();
+                if (event.error === 'no-speech') {
+                    document.getElementById('statusText').innerText = '未偵測到聲音，請再試一次或提高說話音量。';
+                } else if (event.error === 'not-allowed') {
+                    document.getElementById('statusText').innerText = '請在瀏覽器設定中允許麥克風權限以進行聲控。';
+                }
+            };
+
+            recognition.onend = function() {
+                stopListeningUI();
+            };
+        }
+
+        function stopListeningUI() {
+            isListening = false;
+            document.getElementById('micBtn').classList.remove('listening-active');
+            document.getElementById('micIcon').className = 'fa-solid fa-microphone text-2xl';
+            document.getElementById('micLabel').innerText = '開始唸成語';
+            document.getElementById('waveVisualizer').classList.add('hidden');
+            document.getElementById('waveVisualizer').classList.remove('flex');
+            
+            if (!isSolved) {
+                document.getElementById('statusText').innerText = '點擊麥克風按鈕開始語音答題';
+                document.getElementById('statusText').className = 'text-sm font-bold text-amber-800 bg-amber-100/70 px-4 py-1.5 rounded-full';
+            }
+        }
+
+        function toggleSpeechRecognition() {
+            if (isSolved) {
+                nextLevel();
+                return;
+            }
+
+            if (!recognition) {
+                initSpeechRecognition();
+                if (!recognition) return;
+            }
+
+            if (isListening) {
+                recognition.stop();
+            } else {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    recognition.stop();
+                    setTimeout(() => recognition.start(), 200);
+                }
+            }
+        }
+
+        // Render current level puzzle
+        function renderCurrentPuzzle() {
+            isSolved = false;
+            const currentItem = currentFilteredList[currentIndex];
+
+            // Update Header Stats
+            document.getElementById('levelText').innerText = currentIndex + 1;
+            document.getElementById('totalLevelText').innerText = currentFilteredList.length;
+            document.getElementById('categoryBadge').innerHTML = `<i class="fa-solid fa-bookmark"></i> ${currentItem.categoryName}`;
+            document.getElementById('meaningText').innerText = currentItem.meaning;
+            document.getElementById('exampleText').innerText = currentItem.example;
+            document.getElementById('transcriptResult').innerText = '「等待發音中...」';
+            
+            document.getElementById('statusText').innerText = '請按下下方「紅色麥克風」開始對著麥克風唸出完整四字成語';
+            document.getElementById('statusText').className = 'text-sm font-bold text-amber-800 bg-amber-100/70 px-4 py-1.5 rounded-full';
+
+            // Construct character tiles
+            const container = document.getElementById('puzzleContainer');
+            container.innerHTML = '';
+
+            for (let i = 0; i < 4; i++) {
+                const char = currentItem.idiom[i];
+                const zy = currentItem.zhuyin[i];
+                const isMissing = (i === currentItem.missingIndex);
+
+                const tile = document.createElement('div');
+                
+                if (isMissing) {
+                    tile.id = 'missingTileBlock';
+                    tile.className = 'missing-tile w-16 h-20 sm:w-24 sm:h-28 rounded-2xl border-4 border-dashed border-amber-400 flex flex-col items-center justify-center font-black text-2xl sm:text-4xl text-amber-600 shadow-md transition-all relative';
+                    tile.innerHTML = `
+                        <ruby class="select-none">
+                            <span class="opacity-30">＿</span>
+                            <rt class="text-amber-600 font-bold">${zy}</rt>
+                        </ruby>
+                        <span class="absolute -bottom-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">謎底</span>
+                    `;
+                } else {
+                    tile.className = 'w-16 h-20 sm:w-24 sm:h-28 bg-white rounded-2xl border-2 border-amber-300 flex flex-col items-center justify-center font-black text-2xl sm:text-4xl text-slate-800 shadow-md';
+                    tile.innerHTML = `
+                        <ruby class="select-none">
+                            ${char}
+                            <rt>${zy}</rt>
+                        </ruby>
+                    `;
+                }
+
+                container.appendChild(tile);
+            }
+        }
+
+        // Answer Success Handler
+        function handleAnswerSuccess() {
+            if (isSolved) return;
+            isSolved = true;
+
+            const currentItem = currentFilteredList[currentIndex];
+            playSoundEffect('success');
+
+            // Reveal the missing tile
+            const missingTile = document.getElementById('missingTileBlock');
+            if (missingTile) {
+                missingTile.className = 'w-16 h-20 sm:w-24 sm:h-28 rounded-2xl border-2 border-emerald-500 flex flex-col items-center justify-center font-black text-2xl sm:text-4xl shadow-xl tile-revealed';
+                missingTile.innerHTML = `
+                    <ruby class="select-none">
+                        ${currentItem.idiom[currentItem.missingIndex]}
+                        <rt class="text-white">${currentItem.zhuyin[currentItem.missingIndex]}</rt>
+                    </ruby>
+                `;
+            }
+
+            // Confetti
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 80,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            // Update Score
+            score += 10;
+            document.getElementById('scoreText').innerText = score;
+
+            document.getElementById('statusText').innerText = '🎉 太棒了！唸得非常標準，答對過關！';
+            document.getElementById('statusText').className = 'text-sm font-bold text-emerald-700 bg-emerald-100 px-4 py-1.5 rounded-full';
+
+            // Show Victory Modal
+            setTimeout(() => {
+                document.getElementById('victoryDetailText').innerText = `成語【${currentItem.idiom}】語音辨識完全正確！`;
+                document.getElementById('victoryModal').classList.remove('hidden');
+            }, 800);
+        }
+
+        function closeVictoryModalAndNext() {
+            document.getElementById('victoryModal').classList.add('hidden');
+            nextLevel();
+        }
+
+        // TTS Speech Model Demonstration
+        function playModelSpeech() {
+            const currentItem = currentFilteredList[currentIndex];
+            if ('speechSynthesis' in window) {
+                synth.cancel();
+                const utterance = new SpeechSynthesisUtterance(currentItem.idiom);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.8; // Slow for primary school learners
+                synth.speak(utterance);
+            }
+        }
+
+        // Category Switcher
+        function switchCategory(cat) {
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.className = 'cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-white text-amber-800 hover:bg-amber-100 border border-amber-200 transition-all';
+            });
+            
+            const activeBtn = document.getElementById(`cat-${cat}`);
+            if (activeBtn) {
+                activeBtn.className = 'cat-btn px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500 text-white shadow transition-all';
+            }
+
+            if (cat === 'all') {
+                currentFilteredList = [...idiomDatabase];
+            } else {
+                currentFilteredList = idiomDatabase.filter(item => item.category === cat);
+            }
+
+            currentIndex = 0;
+            renderCurrentPuzzle();
+        }
+
+        function nextLevel() {
+            if (currentIndex < currentFilteredList.length - 1) {
+                currentIndex++;
+            } else {
+                currentIndex = 0; // Loop back
+            }
+            renderCurrentPuzzle();
+        }
+
+        function prevLevel() {
+            if (currentIndex > 0) {
+                currentIndex--;
+            } else {
+                currentIndex = currentFilteredList.length - 1;
+            }
+            renderCurrentPuzzle();
+        }
+
+        // Manual Input Modal Functions
+        function toggleManualInputModal() {
+            const modal = document.getElementById('manualModal');
+            modal.classList.toggle('hidden');
+            document.getElementById('manualAnswerInput').value = '';
+        }
+
+        function submitManualAnswer() {
+            const inputVal = document.getElementById('manualAnswerInput').value.trim();
+            const currentItem = currentFilteredList[currentIndex];
+
+            if (inputVal === currentItem.idiom) {
+                toggleManualInputModal();
+                handleAnswerSuccess();
+            } else {
+                playSoundEffect('error');
+                alert(`答錯囉！提示：答案是四個字的成語。`);
+            }
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            initSpeechRecognition();
+            renderCurrentPuzzle();
+        };
+    </script>
+</body>
+</html>
